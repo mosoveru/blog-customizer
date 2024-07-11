@@ -93,6 +93,7 @@ export const ArticleParamsForm = ({
 		setSelectedFontColor({ ...fontColors[0] });
 		setBackgroundColor({ ...backgroundColors[0] });
 		setContentWidth({ ...contentWidthArr[0] });
+		changedStylesRef.current = { ...articleResetStyles };
 	};
 
 	const submitStyles = () => {
