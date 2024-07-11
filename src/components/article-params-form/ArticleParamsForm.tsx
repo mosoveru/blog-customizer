@@ -2,19 +2,20 @@ import { ArrowButton } from 'components/arrow-button';
 import { RadioGroup } from '../radio-group';
 import { Select } from '../select';
 import { Separator } from '../separator';
-import { OptionType } from 'src/constants/articleProps';
+import { ArticleStateType, OptionType } from 'src/constants/articleProps';
 import { Button } from 'components/button';
 import { MouseEventHandler, SetStateAction, useRef, useState } from 'react';
 import { Text } from '../text';
+import { useClose } from './hooks/useClose';
 
 import styles from './ArticleParamsForm.module.scss';
 import clsx from 'clsx';
-import { ArticleStyles } from 'src/index';
 
 type ArticleParamsFormProps = {
-	articleStylesSetState: React.Dispatch<SetStateAction<ArticleStyles>>;
-	readonly articleResetStyles: ArticleStyles;
+	articleStylesSetState: React.Dispatch<SetStateAction<ArticleStateType>>;
 	options: ArticleOptions;
+	articleStyles: ArticleStateType;
+	defaultOptions: ArticleStateType;
 };
 
 type ArticleOptions = {
@@ -27,9 +28,11 @@ type ArticleOptions = {
 
 export const ArticleParamsForm = ({
 	articleStylesSetState,
-	articleResetStyles,
+	articleStyles,
 	options,
+	defaultOptions,
 }: ArticleParamsFormProps) => {
+	//Объект с опциями для Select компонентов
 	const {
 		fontSizeOptions,
 		fontFamilyOptions,
@@ -37,65 +40,60 @@ export const ArticleParamsForm = ({
 		backgroundColors,
 		contentWidthArr,
 	} = options;
+	//Объект с дефолтными опциями
+	const {
+		fontFamilyOption,
+		fontColor,
+		backgroundColor,
+		contentWidth,
+		fontSizeOption,
+	} = defaultOptions;
+	//Стили для отступов в форме
 	const spacingStyles = {
 		width: 554,
 		height: 50,
 	};
-
+	//Реф боковой панели и реф для сохранения измененных стилей
 	const asidePanel = useRef<HTMLElement>(null);
-	const arrowButton = useRef<HTMLDivElement | null>(null);
-
+	const changedStylesRef = useRef<ArticleStateType>({ ...articleStyles });
+	//Стейты для класса боковой панели, состояние панели, а также стейты для Select-компонентов
 	const [panelClass, setPanelClass] = useState(styles.container);
-	const [isOpen, setOpen] = useState(false);
-	const changedStylesRef = useRef<ArticleStyles>({ ...articleResetStyles });
-	const [selectedFont, setSelectedFont] = useState(fontFamilyOptions[0]);
-	const [selectedFontSize, setSelectedFontSize] = useState(fontSizeOptions[0]);
-	const [selectedFontColor, setSelectedFontColor] = useState(fontColors[0]);
-	const [backgroundColor, setBackgroundColor] = useState(backgroundColors[0]);
-	const [contentWidth, setContentWidth] = useState(contentWidthArr[0]);
-
+	const [isMenuOpen, setMenuOpen] = useState(false);
+	const [selectedFont, setSelectedFont] = useState(fontFamilyOption);
+	const [selectedFontSize, setSelectedFontSize] = useState(fontSizeOption);
+	const [selectedFontColor, setSelectedFontColor] = useState(fontColor);
+	const [selectedBackgroundColor, setBackgroundColor] =
+		useState(backgroundColor);
+	const [selectedContentWidth, setContentWidth] = useState(contentWidth);
+	//Функция, которая открывает панель
 	const openPanel = () => {
 		setPanelClass(clsx(styles.container, styles.container_open));
-		setOpen(true);
-		document.addEventListener('click', handleOutsideClick, true);
+		setMenuOpen(true);
 	};
-
+	//Функция, которая закрывает панель
 	const closePanel = () => {
-		setPanelClass(clsx(styles.container));
-		setOpen(false);
-		document.removeEventListener('click', handleOutsideClick, false);
+		setPanelClass(styles.container);
+		setMenuOpen(false);
 	};
-
-	const clickButton: MouseEventHandler = (e) => {
-		e.stopPropagation();
-		if (!isOpen) {
+	//Используем хук, чтобы убрать/навесить слушатель на клик вне панели и на событие клавиатуры
+	useClose({ isOpen: isMenuOpen, onClose: closePanel, rootRef: asidePanel });
+	//Обработчик клика по кнопке со стрелочкой
+	const clickButton: MouseEventHandler = () => {
+		if (!isMenuOpen) {
 			openPanel();
-		} else {
-			closePanel();
 		}
 	};
-
-	const handleOutsideClick = (e: MouseEvent) => {
-		const target = e.target as Node;
-		if (
-			asidePanel.current &&
-			!asidePanel.current?.contains(target) &&
-			!arrowButton.current?.contains(target)
-		) {
-			closePanel();
-		}
-	};
-
+	//Функция для сброса всех значений в значение по умолчанию
 	const resetStyles = () => {
-		articleStylesSetState({ ...articleResetStyles });
-		setSelectedFont({ ...fontFamilyOptions[0] });
-		setSelectedFontSize({ ...fontSizeOptions[0] });
-		setSelectedFontColor({ ...fontColors[0] });
-		setBackgroundColor({ ...backgroundColors[0] });
-		setContentWidth({ ...contentWidthArr[0] });
-		changedStylesRef.current = { ...articleResetStyles };
+		articleStylesSetState({ ...defaultOptions });
+		changedStylesRef.current = { ...defaultOptions };
+		setSelectedFont({ ...fontFamilyOption });
+		setSelectedFontSize({ ...fontSizeOption });
+		setSelectedFontColor({ ...fontColor });
+		setBackgroundColor({ ...backgroundColor });
+		setContentWidth({ ...contentWidth });
 	};
-
+	//Функция, которая записывает изменения стилей в стейт
 	const submitStyles = () => {
 		if (changedStylesRef.current) {
 			articleStylesSetState({ ...changedStylesRef.current });
@@ -104,12 +102,13 @@ export const ArticleParamsForm = ({
 
 	return (
 		<>
-			<ArrowButton state={isOpen} handleClick={clickButton} ref={arrowButton} />
+			<ArrowButton state={isMenuOpen} handleClick={clickButton} />
 			<aside className={panelClass} ref={asidePanel}>
 				<form
 					className={styles.form}
 					onSubmit={(e) => {
 						e.preventDefault();
+						submitStyles();
 					}}>
 					<Text as={'h2'} uppercase family='open-sans' size={31} weight={800}>
 						Задайте параметры
@@ -117,7 +116,7 @@ export const ArticleParamsForm = ({
 					<div style={spacingStyles} />
 					<Select
 						onChange={(option) => {
-							changedStylesRef.current['--font-family'] = option.value;
+							changedStylesRef.current.fontFamilyOption = option;
 							setSelectedFont({ ...option });
 						}}
 						options={fontFamilyOptions}
@@ -130,7 +129,7 @@ export const ArticleParamsForm = ({
 						options={fontSizeOptions}
 						selected={selectedFontSize}
 						onChange={(option) => {
-							changedStylesRef.current['--font-size'] = option.value;
+							changedStylesRef.current.fontSizeOption = option;
 							setSelectedFontSize({ ...option });
 						}}
 						title='Размер шрифта'
@@ -138,7 +137,7 @@ export const ArticleParamsForm = ({
 					<div style={spacingStyles} />
 					<Select
 						onChange={(option) => {
-							changedStylesRef.current['--font-color'] = option.value;
+							changedStylesRef.current.fontColor = option;
 							setSelectedFontColor({ ...option });
 						}}
 						options={fontColors}
@@ -149,21 +148,21 @@ export const ArticleParamsForm = ({
 					<div style={spacingStyles} />
 					<Select
 						onChange={(option) => {
-							changedStylesRef.current['--bg-color'] = option.value;
+							changedStylesRef.current.backgroundColor = option;
 							setBackgroundColor({ ...option });
 						}}
 						options={backgroundColors}
-						selected={backgroundColor}
+						selected={selectedBackgroundColor}
 						title='Цвет фона'
 					/>
 					<div style={spacingStyles} />
 					<Select
 						onChange={(option) => {
-							changedStylesRef.current['--container-width'] = option.value;
+							changedStylesRef.current.contentWidth = option;
 							setContentWidth({ ...option });
 						}}
 						options={contentWidthArr}
-						selected={contentWidth}
+						selected={selectedContentWidth}
 						title='Ширина контента'
 					/>
 					<div className={styles.bottomContainer}>
@@ -176,7 +175,6 @@ export const ArticleParamsForm = ({
 						<Button
 							title='Применить'
 							type='submit'
-							onClick={submitStyles}
 							buttonStyles={{ '--button-bg': '#FFC802', '--hover': '#FFEDAB' }}
 						/>
 					</div>
